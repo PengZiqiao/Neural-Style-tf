@@ -14,9 +14,9 @@ STYLE_WEIGHT = 500
 ITERATION = 250
 
 CONTENT_LAYERS = [('conv4_2', 1.)]
-STYLE_LAYERS = [('conv1_1', 0.5), ('conv2_1', 1.), ('conv3_1', 1.5), ('conv4_1', 3.), ('conv5_1', 4.)]
+# STYLE_LAYERS = [('conv1_1', 0.5), ('conv2_1', 1.), ('conv3_1', 1.5), ('conv4_1', 3.), ('conv5_1', 4.)]
 # STYLE_LAYERS=[('conv1_1',1.),('conv2_1',1.5),('conv3_1',2.),('conv4_1',2.5),('conv5_1',3.)]
-# STYLE_LAYERS = [('conv1_1', 0.2), ('conv2_1', 0.2), ('conv3_1', 0.2), ('conv4_1', 0.2), ('conv5_1', 0.2)]
+STYLE_LAYERS = [('conv1_1', 0.2), ('conv2_1', 0.2), ('conv3_1', 0.2), ('conv4_1', 0.2), ('conv5_1', 0.2)]
 
 MEAN_VALUES = np.array([123.68, 116.779, 103.939]).reshape((1, 1, 1, 3))
 
@@ -100,8 +100,8 @@ def build_vgg19(img):
 
 def content_layer_loss(p, x):
     _, h, w, d = p.shape
-    M = p.h * p.w
-    N = p.d
+    M = h * w
+    N = d
     K = 1. / (2 * N ** 0.5 * M ** 0.5)
     loss = K * tf.reduce_sum(tf.pow((x - p), 2))
     return loss
@@ -115,8 +115,8 @@ def gram_matrix(x, area, depth):
 
 def style_layer_loss(a, x):
     _, h, w, d = a.shape
-    M = a.h * a.w
-    N = a.d
+    M = h * w
+    N = d
     A = gram_matrix(a, M, N)
     G = gram_matrix(x, M, N)
     loss = (1. / (4 * N ** 2 * M ** 2)) * tf.reduce_sum(tf.pow((G - A), 2))
@@ -146,7 +146,7 @@ def main():
     """minimize with lbfgs"""
     print("minimizing with lbfgs...")
     optimizer = tf.contrib.opt.ScipyOptimizerInterface(L_total, method='L-BFGS-B',
-                                                       options={'maxiter': ITERATION, 'disp': 50})
+                                                       options={'maxiter': ITERATION, 'disp': 1})
     sess.run(tf.global_variables_initializer())
     sess.run(net['input'].assign(init_img))
     optimizer.minimize(sess)
@@ -156,5 +156,5 @@ def main():
     print("outputing image...")
     save_image(os.path.join(OUTOUT_DIR, OUTPUT_IMG), result_img)
 
-    if __name__ == '__main__':
-        main()
+if __name__ == '__main__':
+    main()
