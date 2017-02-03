@@ -2,28 +2,28 @@
 基于Tensoflow的风格迁移实例。
 
 ## 依赖
-- tensoflow
+- tensorflow
 - numpy
 - scipy
 
 ## 效果
 Contents: <br/>
-<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/images/content_0.jpg" width="25%"/> 
-<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/images/content_1.jpg" width="25%"/> 
+<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/images/content_0.jpg" width="30%"/> 
+<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/images/content_1.jpg" width="30%"/> 
 <br/>
 Styles: <br/>
-<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/images/style_0.jpg" width="25%"/> 
-<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/images/style_1.jpg" width="25%"/> 
-<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/images/style_2.jpg" width="25%"/> 
+<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/images/style_0.jpg" width="30%"/> 
+<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/images/style_1.jpg" width="30%"/> 
+<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/images/style_2.jpg" width="30%"/> 
 <br/>
 Results: <br/>
-<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/results/result_00.jpg" width="25%"/>
-<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/results/result_01.jpg" width="25%"/>
-<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/results/result_02.jpg" width="25%"/>
+<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/results/result_00.jpg" width="30%"/>
+<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/results/result_01.jpg" width="30%"/>
+<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/results/result_02.jpg" width="30%"/>
 <br/>
-<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/results/result_10.jpg" width="25%"/>
-<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/results/result_11.jpg" width="25%"/>
-<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/results/result_12.jpg" width="25%"/>
+<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/results/result_10.jpg" width="30%"/>
+<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/results/result_11.jpg" width="30%"/>
+<img src="https://github.com/PengZiqiao/Neural-Style-tf/blob/master/results/result_12.jpg" width="30%"/>
 <br/>
 
 ## 常量
