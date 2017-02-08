@@ -4,21 +4,15 @@ import scipy.io
 import scipy.misc
 import os
 
-# CONTENT_IMG = './images/test2.jpg'
 CONTENT_DIR = './images'
-CONTENT_IMG = input('Content image:')
-CONTENT_IMG = os.path.join(CONTENT_DIR, CONTENT_IMG)
-# STYLE_IMG = './images/StarryNight.jpg'
-STYLE_DIR = './images'
-STYLE_IMG = input('Style image:')
-STYLE_IMG = os.path.join(STYLE_DIR, STYLE_IMG)
-
+STYLE_DIR = './styles'
 OUTOUT_DIR = './results'
 OUTPUT_IMG = 'results.jpg'
 VGG_MODEL = 'imagenet-vgg-verydeep-19.mat'
 INI_NOISE_RATIO = 0.7
 STYLE_WEIGHT = 500
 ITERATION = 250
+
 
 CONTENT_LAYERS = [('conv4_2', 1.)]
 # STYLE_LAYERS = [('conv1_1', 0.5), ('conv2_1', 1.), ('conv3_1', 1.5), ('conv4_1', 3.), ('conv5_1', 4.)]
@@ -136,11 +130,18 @@ def style_layer_loss(a, x):
     return loss
 
 
-def main():
-    print("loading image...")
-    content_img = load_image(CONTENT_IMG)
-    style_img = load_image(STYLE_IMG)
+def main(content, style):
+    output = "{0}_{1}".format(style, content)
+    c = os.path.join(CONTENT_DIR, content)
+    s = os.path.join(STYLE_DIR, style)
+    o = os.path.join(OUTOUT_DIR, output)
+
+    print("Content: {}".format(c))
+    content_img = load_image(c)
+    print("Style: {}".format(s))
+    style_img = load_image(s)
     init_img = noise_image(content_img)
+    print("Output: {}".format(o))
 
     print("building vgg19...")
     net = build_vgg19(content_img)
@@ -167,7 +168,25 @@ def main():
 
     """output"""
     print("outputing image...")
-    save_image(os.path.join(OUTOUT_DIR, OUTPUT_IMG), result_img)
+    save_image(o, result_img)
 
 if __name__ == '__main__':
-    main()
+    mode = input("Input '1' to make just one image, '2' to make all images in the folder:")
+    if mode == 1:
+        print('*** make one! ***')
+        c_image = input('Content image:')
+        s_image = input('Style image:')
+        main(c_image, s_image)
+    else:
+        print('*** make all! ***')
+        content_list = list()
+        style_list = list()
+        for rt, dirs, files in os.walk(CONTENT_DIR):
+            for f in files:
+                content_list.append(f)
+        for rt, dirs, files in os.walk(STYLE_DIR):
+            for f in files:
+                style_list.append(f)
+        for c_image in content_list:
+            for s_image in style_list:
+                main(c_image, s_image)
