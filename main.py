@@ -22,10 +22,12 @@ STYLE_LAYERS = [('conv1_1', 0.2), ('conv2_1', 0.2), ('conv3_1', 0.2), ('conv4_1'
 MEAN_VALUES = np.array([123.68, 116.779, 103.939]).reshape((1, 1, 1, 3))
 
 
-def load_image(path):
+def load_image(path, content):
+    c = scipy.misc.imread(content)
     image = scipy.misc.imread(path)
     # shape (h, w, d) to (1, h, w, d)
-    image = image[np.newaxis, :, :, :]
+    h, w, d = c.shape
+    image = image[np.newaxis, :h, :w, :d]
     # Input to the VGG model expects the mean to be subtracted.
     image = image - MEAN_VALUES
     return image
