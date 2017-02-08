@@ -4,8 +4,15 @@ import scipy.io
 import scipy.misc
 import os
 
-CONTENT_IMG = './images/test2.jpg'
-STYLE_IMG = './images/StarryNight.jpg'
+# CONTENT_IMG = './images/test2.jpg'
+CONTENT_DIR = './images'
+CONTENT_IMG = input('Content image:')
+CONTENT_IMG = os.path.join(CONTENT_DIR, CONTENT_IMG)
+# STYLE_IMG = './images/StarryNight.jpg'
+STYLE_DIR = './images'
+STYLE_IMG = input('Style image:')
+STYLE_IMG = os.path.join(STYLE_DIR, STYLE_IMG)
+
 OUTOUT_DIR = './results'
 OUTPUT_IMG = 'results.jpg'
 VGG_MODEL = 'imagenet-vgg-verydeep-19.mat'
@@ -113,11 +120,17 @@ def gram_matrix(x, area, depth):
     return G
 
 
+def gram_matrix_val(x, area, depth):
+    F = x.reshape(area, depth)
+    G = np.dot(F.T, F)
+    return G
+
+
 def style_layer_loss(a, x):
     _, h, w, d = a.shape
     M = h * w
     N = d
-    A = gram_matrix(a, M, N)
+    A = gram_matrix_val(a, M, N)
     G = gram_matrix(x, M, N)
     loss = (1. / (4 * N ** 2 * M ** 2)) * tf.reduce_sum(tf.pow((G - A), 2))
     return loss
