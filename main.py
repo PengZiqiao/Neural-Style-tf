@@ -139,9 +139,9 @@ def main(content, style):
     o = os.path.join(OUTOUT_DIR, output)
 
     print("Content: {}".format(c))
-    content_img = load_image(c)
+    content_img = load_image(c, c)
     print("Style: {}".format(s))
-    style_img = load_image(s)
+    style_img = load_image(s, c)
     init_img = noise_image(content_img)
     print("Output: {}".format(o))
 
