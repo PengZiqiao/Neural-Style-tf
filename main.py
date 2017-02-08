@@ -143,7 +143,7 @@ def main():
     init_img = noise_image(content_img)
 
     print("building vgg19...")
-    net = build_vgg19()
+    net = build_vgg19(content_img)
 
     print("starting tf.session...")
     sess = tf.Session()
