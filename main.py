@@ -3,50 +3,42 @@ import numpy as np
 import scipy.io
 import scipy.misc
 import os
+from argparse import ArgumentParser
 
 CONTENT_DIR = './images'
 STYLE_DIR = './styles'
-OUTOUT_DIR = './results'
+OUTPUT_DIR = './results'
 OUTPUT_IMG = 'results.jpg'
 VGG_MODEL = 'imagenet-vgg-verydeep-19.mat'
-INI_NOISE_RATIO = 0.7
-STYLE_WEIGHT = 500
-ITERATION = 250
-
 
 CONTENT_LAYERS = [('conv4_2', 1.)]
-# STYLE_LAYERS = [('conv1_1', 0.5), ('conv2_1', 1.), ('conv3_1', 1.5), ('conv4_1', 3.), ('conv5_1', 4.)]
-# STYLE_LAYERS=[('conv1_1',1.),('conv2_1',1.5),('conv3_1',2.),('conv4_1',2.5),('conv5_1',3.)]
-STYLE_LAYERS = [('conv1_1', 0.2), ('conv2_1', 0.2), ('conv3_1', 0.2), ('conv4_1', 0.2), ('conv5_1', 0.2)]
+layer_list = (
+    [('conv1_1', 0.2), ('conv2_1', 0.2), ('conv3_1', 0.2), ('conv4_1', 0.2), ('conv5_1', 0.2)],
+    [('conv1_1', 0.5), ('conv2_1', 1.), ('conv3_1', 1.5), ('conv4_1', 3.), ('conv5_1', 4.)],
+    [('conv1_1', 1.), ('conv2_1', 1.5), ('conv3_1', 2.), ('conv4_1', 2.5), ('conv5_1', 3.)]
+)
+STYLE_LAYERS = layer_list[0]
 
 MEAN_VALUES = np.array([123.68, 116.779, 103.939]).reshape((1, 1, 1, 3))
 
 
-def load_image(path, content):
-    c = scipy.misc.imread(content)
-    image = scipy.misc.imread(path)
-    # shape (h, w, d) to (1, h, w, d)
-    h, w, d = c.shape
-    image = image[np.newaxis, :h, :w, :d]
-    # Input to the VGG model expects the mean to be subtracted.
-    image = image - MEAN_VALUES
-    return image
-
-
-def save_image(path, image):
-    # Output should add back the mean.
-    image = image + MEAN_VALUES
-    # shape (1, h, w, d) to (h, w, d)
-    image = image[0]
-    image = np.clip(image, 0, 255).astype('uint8')
-    scipy.misc.imsave(path, image)
-
-
-def noise_image(content_img):
-    _, h, w, d = content_img.shape
-    init_img = np.random.uniform(-20, 20, (1, h, w, d)).astype('float32')
-    init_img = INI_NOISE_RATIO * init_img + (1. - INI_NOISE_RATIO) * content_img
-    return init_img
+def build_parser():
+    desc = 'TensorFlow implementation of "A Neural Algorithm for Artisitc Style"'
+    parser = ArgumentParser(description=desc)
+    parser.add_argument('--content', type=str,
+                        help='file name of content image, e.g. Tuebingen.jpg')
+    parser.add_argument('--style', type=str,
+                        help='file name of style image, e.g. StarryNight.jpg')
+    parser.add_argument('--weight', type=float, default=500,
+                        help='style weight, e.g. 500', )
+    parser.add_argument('--noise', type=float, default=0.6,
+                        help='noise ratio of init image, e.g. 0.6')
+    parser.add_argument('--iter', type=int, default=250,
+                        help='number of args.iters, e.g. 800')
+    parser.add_argument('--mode', type=int, default='ALL',
+                        choices=['ONE', 'ALL'],
+                        help='choose mode to draw just ONE image or ALL images in the foldere.g. ALL')
+    return parser
 
 
 def build_vgg19(img):
@@ -69,8 +61,8 @@ def build_vgg19(img):
     vgg_rawnet = scipy.io.loadmat(VGG_MODEL)
     vgg_layers = vgg_rawnet['layers'][0]
 
+    _h, w, d = img.shape
     net = dict()
-    _, h, w, d = img.shape
     net['input'] = tf.Variable(np.zeros((1, h, w, d)).astype('float32'))
     # LAYER GROUP 1
     net['conv1_1'] = conv_layer(net['input'], get_weight_bias(0))
@@ -132,37 +124,70 @@ def style_layer_loss(a, x):
     return loss
 
 
+def read_image(content, style):
+    def get_shape():
+        height, width, channel = content.shape
+        return height, width, channel
+
+    def load(path):
+        img = scipy.misc.imread(path)
+        # shape (h, w, d) to (1, h, w, d)
+        img = img[np.newaxis, :h, :w, :d]
+        # Input to the VGG model expects the mean to be subtracted.
+        img = img - MEAN_VALUES
+        return img
+
+    h, w, d = get_shape()
+    content_img = load(content)
+    style_img = load(style)
+    return content_img, style_img
+
+
+def save_image(path, img):
+    # Output should add back the mean.
+    img = img + MEAN_VALUES
+    # shape (1, h, w, d) to (h, w, d)
+    img = img[0]
+    img = np.clip(img, 0, 255).astype('uint8')
+    scipy.misc.imsave(path, img)
+
+
+def noise_image(img):
+    _, h, w, d = img.shape
+    init = np.random.uniform(-20, 20, (1, h, w, d)).astype('float32')
+    init = args.noise * init + (1. - args.noise) * img
+    return init
+
+
 def main(content, style):
-    output = "{0}_{1}".format(style, content)
+    # 输出文件名为“style_content.jpg”的形式
+    output = "{}_{}".format(style.replace('.jpg', ''), content)
+    # 将文件名补充成完整路径
     c = os.path.join(CONTENT_DIR, content)
     s = os.path.join(STYLE_DIR, style)
-    o = os.path.join(OUTOUT_DIR, output)
-
-    print("Content: {}".format(c))
-    content_img = load_image(c, c)
-    print("Style: {}".format(s))
-    style_img = load_image(s, c)
+    o = os.path.join(OUTPUT_DIR, output)
+    # 读入content、style文件，并生成init_img
+    print(">>>Reading images...")
+    print(">>>content: {}, style: {}".format(content, style))
+    content_img, style_img = read_image(c, s)
     init_img = noise_image(content_img)
-    print("Output: {}".format(o))
-
-    print("building vgg19...")
+    # 构建神经网络
+    print(">>>Building neaural net...")
     net = build_vgg19(content_img)
-
-    print("starting tf.session...")
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
-
-    print("stylizing...")
+    # 计算loss
+    print(">>>Calculating: L_total = L_content + weight * L_style")
     sess.run([net['input'].assign(content_img)])
     L_content = sum(map(lambda l: l[1] * content_layer_loss(sess.run(net[l[0]]), net[l[0]]), CONTENT_LAYERS))
     sess.run([net['input'].assign(style_img)])
     L_style = sum(map(lambda l: l[1] * style_layer_loss(sess.run(net[l[0]]), net[l[0]]), STYLE_LAYERS))
-    L_total = L_content + STYLE_WEIGHT * L_style
+    L_total = L_content + args.weight * L_style
 
     """minimize with lbfgs"""
     print("minimizing with lbfgs...")
     optimizer = tf.contrib.opt.ScipyOptimizerInterface(L_total, method='L-BFGS-B',
-                                                       options={'maxiter': ITERATION, 'disp': 1})
+                                                       options={'maxiter': args.iter, 'disp': 1})
     sess.run(tf.global_variables_initializer())
     sess.run(net['input'].assign(init_img))
     optimizer.minimize(sess)
@@ -172,13 +197,15 @@ def main(content, style):
     print("outputing image...")
     save_image(o, result_img)
 
+
 if __name__ == '__main__':
+    args = build_parser()
     mode = input("Input '1' to make just one image, '2' to make all images in the folder:")
-    if mode == 1:
+    if args.mode == "ONE":
         print('*** make one! ***')
         c_image = input('Content image:')
         s_image = input('Style image:')
-        main(c_image, s_image)
+        main(args.content, args.style)
     else:
         print('*** make all! ***')
         content_list = list()
