@@ -38,7 +38,8 @@ def build_parser():
     parser.add_argument('--mode', type=int, default='ALL',
                         choices=['ONE', 'ALL'],
                         help='choose mode to draw just ONE image or ALL images in the foldere.g. ALL')
-    return parser
+    args = parser.parse_args()
+    return args
 
 
 def build_vgg19(img):
