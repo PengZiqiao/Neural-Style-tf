@@ -9,16 +9,14 @@ CONTENT_DIR = './images'
 STYLE_DIR = './styles'
 OUTPUT_DIR = './results'
 OUTPUT_IMG = 'results.jpg'
-VGG_MODEL = 'imagenet-vgg-verydeep-19.mat'
 
-CONTENT_LAYERS = [('conv4_2', 1.)]
 layer_list = (
     [('conv1_1', 0.2), ('conv2_1', 0.2), ('conv3_1', 0.2), ('conv4_1', 0.2), ('conv5_1', 0.2)],
     [('conv1_1', 0.5), ('conv2_1', 1.), ('conv3_1', 1.5), ('conv4_1', 3.), ('conv5_1', 4.)],
     [('conv1_1', 1.), ('conv2_1', 1.5), ('conv3_1', 2.), ('conv4_1', 2.5), ('conv5_1', 3.)]
 )
 STYLE_LAYERS = layer_list[0]
-
+CONTENT_LAYERS = [('conv4_2', 1.)]
 MEAN_VALUES = np.array([123.68, 116.779, 103.939]).reshape((1, 1, 1, 3))
 
 
@@ -35,94 +33,193 @@ def build_parser():
                         help='noise ratio of init image, e.g. 0.6')
     parser.add_argument('--iter', type=int, default=250,
                         help='number of args.iters, e.g. 800')
-    parser.add_argument('--mode', type=int, default='ALL',
+    parser.add_argument('--mode', type=str, default='ALL',
                         choices=['ONE', 'ALL'],
                         help='choose mode to draw just ONE image or ALL images in the foldere.g. ALL')
     args = parser.parse_args()
     return args
 
 
-def build_vgg19(img):
-    def conv_layer(layer_input, weight_bias):
-        conv = tf.nn.conv2d(layer_input, weight_bias[0], strides=[1, 1, 1, 1], padding='SAME')
-        relu = tf.nn.relu(conv + weight_bias[1])
-        return relu
+class NeuralStyle:
+    """风格迁移类
+    """
 
-    def pool_layer(layer_input):
-        pool = tf.nn.avg_pool(layer_input, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-        return pool
+    def __init__(self, content, style, output="result.jpg", style_weight=1 / 8e-4, noise_ratio=0.7, iterations=250):
+        self.content = content  # 内容图像文件名
+        self.style = style  # 风格图像文件名
+        self.output = output  # 输出图像文件名
+        self.style_weight = style_weight  # 风格权重
+        self.noise_ratio = noise_ratio  # 随机噪声比例
+        self.iterations = iterations  # 训练迭代次数
+        pass
 
-    def get_weight_bias(i):
-        weight = vgg_layers[i][0][0][0][0][0]
-        weight = tf.constant(weight)
-        bias = vgg_layers[i][0][0][0][0][1]
-        bias = tf.constant(np.reshape(bias, (bias.size)))
-        return weight, bias
+    def get_shape(self, path):
+        """确定图像尺寸
+        以content的图像尺寸为标准
+        """
+        img = scipy.misc.imread(path)
+        height, width, channel = img.shape
+        return height, width, channel
 
-    vgg_rawnet = scipy.io.loadmat(VGG_MODEL)
-    vgg_layers = vgg_rawnet['layers'][0]
+    def read_image(self, path, shape):
+        """读入图像
+        path: 文件地址
+        shape: 图像尺寸
+        """
+        h, w, d = shape
+        img = scipy.misc.imread(path)
+        # shape (h, w, d) to (1, h, w, d)
+        img = img[np.newaxis, :h, :w, :d]
+        # Input to the VGG model expects the mean to be subtracted.
+        image = img - MEAN_VALUES
+        return image
 
-    _h, w, d = img.shape
-    net = dict()
-    net['input'] = tf.Variable(np.zeros((1, h, w, d)).astype('float32'))
-    # LAYER GROUP 1
-    net['conv1_1'] = conv_layer(net['input'], get_weight_bias(0))
-    net['conv1_2'] = conv_layer(net['conv1_1'], get_weight_bias(2))
-    net['pool1'] = pool_layer(net['conv1_2'])
-    # LAYER GROUP 2
-    net['conv2_1'] = conv_layer(net['pool1'], get_weight_bias(5))
-    net['conv2_2'] = conv_layer(net['conv2_1'], get_weight_bias(7))
-    net['pool2'] = pool_layer(net['conv2_2'])
-    # LAYER GROUP 3
-    net['conv3_1'] = conv_layer(net['pool2'], get_weight_bias(10))
-    net['conv3_2'] = conv_layer(net['conv3_1'], get_weight_bias(12))
-    net['conv3_3'] = conv_layer(net['conv3_2'], get_weight_bias(14))
-    net['conv3_4'] = conv_layer(net['conv3_3'], get_weight_bias(16))
-    net['pool3'] = pool_layer(net['conv3_4'])
-    # LAYER GROUP 4
-    net['conv4_1'] = conv_layer(net['pool3'], get_weight_bias(19))
-    net['conv4_2'] = conv_layer(net['conv4_1'], get_weight_bias(21))
-    net['conv4_3'] = conv_layer(net['conv4_2'], get_weight_bias(23))
-    net['conv4_4'] = conv_layer(net['conv4_3'], get_weight_bias(25))
-    net['pool4'] = pool_layer(net['conv4_4'])
-    # LAYER GROUP 5
-    net['conv5_1'] = conv_layer(net['pool4'], get_weight_bias(28))
-    net['conv5_2'] = conv_layer(net['conv5_1'], get_weight_bias(30))
-    net['conv5_3'] = conv_layer(net['conv5_2'], get_weight_bias(32))
-    net['conv5_4'] = conv_layer(net['conv5_3'], get_weight_bias(34))
-    net['pool5'] = pool_layer(net['conv5_4'])
-    return net
+    def save_image(self, path, image):
+        """保存图像
+        path: 存放地址
+        img: 保存的图片
+        """
+        # Output should add back the mean.
+        img = image + MEAN_VALUES
+        # shape (1, h, w, d) to (h, w, d)
+        img = img[0]
+        img = np.clip(img, 0, 255).astype('uint8')
+        scipy.misc.imsave(path, img)
 
+    def noise_image(self, img, shape, noise):
+        """生成初始图像
+        img: 用于和nosie混合的图
+        shape: 图像尺寸
+        noise: 随机噪声的比重
+        """
+        h, w, d = shape
+        init = np.random.uniform(-20, 20, (1, h, w, d)).astype('float32')
+        init = noise * init + (1. - noise) * img
+        return init
 
-def content_layer_loss(p, x):
-    _, h, w, d = p.shape
-    M = h * w
-    N = d
-    K = 1. / (2 * N ** 0.5 * M ** 0.5)
-    loss = K * tf.reduce_sum(tf.pow((x - p), 2))
-    return loss
+    def build_vgg19(self, shape):
+        """构建神经网络"""
 
+        def conv_layer(layer_input, weight_bias):
+            conv = tf.nn.conv2d(layer_input, weight_bias[0], strides=[1, 1, 1, 1], padding='SAME')
+            relu = tf.nn.relu(conv + weight_bias[1])
+            return relu
 
-def gram_matrix(x, area, depth):
-    F = tf.reshape(x, (area, depth))
-    G = tf.matmul(tf.transpose(F), F)
-    return G
+        def pool_layer(layer_input):
+            pool = tf.nn.avg_pool(layer_input, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+            return pool
 
+        def get_weight_bias(i):
+            weight = vgg_layers[i][0][0][0][0][0]
+            weight = tf.constant(weight)
+            bias = vgg_layers[i][0][0][0][0][1]
+            bias = tf.constant(np.reshape(bias, (bias.size)))
+            return weight, bias
 
-def gram_matrix_val(x, area, depth):
-    F = x.reshape(area, depth)
-    G = np.dot(F.T, F)
-    return G
+        vgg_rawnet = scipy.io.loadmat('imagenet-vgg-verydeep-19.mat')  # 请先将vgg19放置在项目根目录
+        vgg_layers = vgg_rawnet['layers'][0]
 
+        h, w, d = shape
+        net = dict()
+        net['input'] = tf.Variable(np.zeros((1, h, w, d)).astype('float32'))
+        # LAYER GROUP 1
+        net['conv1_1'] = conv_layer(net['input'], get_weight_bias(0))
+        net['conv1_2'] = conv_layer(net['conv1_1'], get_weight_bias(2))
+        net['pool1'] = pool_layer(net['conv1_2'])
+        # LAYER GROUP 2
+        net['conv2_1'] = conv_layer(net['pool1'], get_weight_bias(5))
+        net['conv2_2'] = conv_layer(net['conv2_1'], get_weight_bias(7))
+        net['pool2'] = pool_layer(net['conv2_2'])
+        # LAYER GROUP 3
+        net['conv3_1'] = conv_layer(net['pool2'], get_weight_bias(10))
+        net['conv3_2'] = conv_layer(net['conv3_1'], get_weight_bias(12))
+        net['conv3_3'] = conv_layer(net['conv3_2'], get_weight_bias(14))
+        net['conv3_4'] = conv_layer(net['conv3_3'], get_weight_bias(16))
+        net['pool3'] = pool_layer(net['conv3_4'])
+        # LAYER GROUP 4
+        net['conv4_1'] = conv_layer(net['pool3'], get_weight_bias(19))
+        net['conv4_2'] = conv_layer(net['conv4_1'], get_weight_bias(21))
+        net['conv4_3'] = conv_layer(net['conv4_2'], get_weight_bias(23))
+        net['conv4_4'] = conv_layer(net['conv4_3'], get_weight_bias(25))
+        net['pool4'] = pool_layer(net['conv4_4'])
+        # LAYER GROUP 5
+        net['conv5_1'] = conv_layer(net['pool4'], get_weight_bias(28))
+        net['conv5_2'] = conv_layer(net['conv5_1'], get_weight_bias(30))
+        net['conv5_3'] = conv_layer(net['conv5_2'], get_weight_bias(32))
+        net['conv5_4'] = conv_layer(net['conv5_3'], get_weight_bias(34))
+        net['pool5'] = pool_layer(net['conv5_4'])
+        return net
 
-def style_layer_loss(a, x):
-    _, h, w, d = a.shape
-    M = h * w
-    N = d
-    A = gram_matrix_val(a, M, N)
-    G = gram_matrix(x, M, N)
-    loss = (1. / (4 * N ** 2 * M ** 2)) * tf.reduce_sum(tf.pow((G - A), 2))
-    return loss
+    def loss(self, sess, net, content_img, style_img):
+        """计算loss"""
+
+        def sum_content_losses():
+            def content_layer_loss(p, x):
+                # _, h, w, d = p.shape
+                # M = h * w
+                # N = d
+                # K = 1. / (2 * N ** 0.5 * M ** 0.5)
+                K = 0.5
+                loss = K * tf.reduce_sum(tf.pow((x - p), 2))
+                return loss
+
+            sess.run(net['input'].assign(content_img))
+            content_loss = 0.
+            for layer, weight in CONTENT_LAYERS:
+                p = sess.run(net[layer])
+                x = net[layer]
+                p = tf.convert_to_tensor(p)
+                content_loss += content_layer_loss(p, x) * weight
+            return content_loss
+
+        def sum_style_losses():
+            def style_layer_loss(a, x):
+                _, h, w, d = a.shape
+                M = h * w
+                N = d
+                A = gram_matrix(a, M, N)
+                G = gram_matrix(x, M, N)
+                K = 1. / (4 * N ** 2 * M ** 2)
+                loss = K * tf.reduce_sum(tf.pow((G - A), 2))
+                return loss
+
+            def gram_matrix(x, area, depth):
+                F = tf.reshape(x, (area, depth))
+                G = tf.matmul(tf.transpose(F), F)
+                return G
+
+            sess.run(net['input'].assign(style_img))
+            style_loss = 0.
+            for layer, weight in STYLE_LAYERS:
+                a = sess.run(net[layer])
+                x = net[layer]
+                a = tf.convert_to_tensor(a)
+                style_loss += style_layer_loss(a, x) * weight
+            return style_loss
+
+        L_content = sum_content_losses()
+        L_style = sum_style_losses()
+        L_total = L_content + self.style_weight * L_style
+        return L_total
+
+    def main(self):
+        # 将文件路径补充完整
+        content_path = os.path.join(CONTENT_DIR, self.content)
+        style_path = os.path.join(STYLE_DIR, self.style)
+        output_path = os.path.join(OUTPUT_DIR, self.output)
+        # 确定图像尺寸
+        shape = self.get_shape(content_path)
+        # 读入图片
+        print(">>>正在读取文件...")
+        print(">>>content: {}, style: {}".format(self.content, self.style))
+        content_img = self.read_image(content_path, shape)
+        style_img = self.read_image(style_path, shape)
+        init_img = self.noise_image(content_img, shape, self.noise_ratio)
+        # 构建神经网络
+        print(">>>Building neaural net...")
+        net = self.build_vgg19(shape)  # TODO
+        sess = tf.Session()
+        sess.run(tf.global_variables_initializer())
 
 
 def read_image(content, style):
@@ -161,17 +258,6 @@ def noise_image(img):
 
 
 def main(content, style):
-    # 输出文件名为“style_content.jpg”的形式
-    output = "{}_{}".format(style.replace('.jpg', ''), content)
-    # 将文件名补充成完整路径
-    c = os.path.join(CONTENT_DIR, content)
-    s = os.path.join(STYLE_DIR, style)
-    o = os.path.join(OUTPUT_DIR, output)
-    # 读入content、style文件，并生成init_img
-    print(">>>Reading images...")
-    print(">>>content: {}, style: {}".format(content, style))
-    content_img, style_img = read_image(c, s)
-    init_img = noise_image(content_img)
     # 构建神经网络
     print(">>>Building neaural net...")
     net = build_vgg19(content_img)
