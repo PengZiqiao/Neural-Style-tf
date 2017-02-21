@@ -173,9 +173,9 @@ class NeuralStyle:
 
         def sum_style_losses():
             def style_layer_loss(a, x):
-                _, h, w, d = a.shape
-                M = h * w
-                N = d
+                _, h, w, d = a.get_shape()
+                M = h.value * w.value
+                N = d.value
                 A = gram_matrix(a, M, N)
                 G = gram_matrix(x, M, N)
                 K = 1. / (4 * N ** 2 * M ** 2)
@@ -241,5 +241,5 @@ class NeuralStyle:
 
 if __name__ == '__main__':
     option = build_parser()
-    artist = NeuralStyle(option.content, option.style)
+    artist = NeuralStyle(content=option.content, style=option.style, style_weight=option.weight, noise_ratio=option.noise, iterations=option.iter)
     artist.draw()
