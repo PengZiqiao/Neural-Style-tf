@@ -21,21 +21,20 @@ MEAN_VALUES = np.array([123.68, 116.779, 103.939]).reshape((1, 1, 1, 3))
 
 
 def build_parser():
-    desc = 'TensorFlow implementation of "A Neural Algorithm for Artisitc Style"'
+    """通过命令行设置参数
+    """
+    desc = '---- 基于Tensorflow的风格迁移实例 ----'
     parser = ArgumentParser(description=desc)
     parser.add_argument('--content', type=str,
-                        help='file name of content image, e.g. Tuebingen.jpg')
+                        help='内容图像文件名， e.g. Tuebingen.jpg')
     parser.add_argument('--style', type=str,
-                        help='file name of style image, e.g. StarryNight.jpg')
+                        help='风格图像文件名， e.g. StarryNight.jpg')
     parser.add_argument('--weight', type=float, default=500,
-                        help='style weight, e.g. 500', )
+                        help='风格权重， e.g. 500', )
     parser.add_argument('--noise', type=float, default=0.6,
-                        help='noise ratio of init image, e.g. 0.6')
+                        help='初始图像的随机噪声比例， e.g. 0.6')
     parser.add_argument('--iter', type=int, default=250,
-                        help='number of args.iters, e.g. 800')
-    parser.add_argument('--mode', type=str, default='ALL',
-                        choices=['ONE', 'ALL'],
-                        help='choose mode to draw just ONE image or ALL images in the foldere.g. ALL')
+                        help='训练迭代次数， e.g. 800')
     args = parser.parse_args()
     return args
 
@@ -49,7 +48,7 @@ class NeuralStyle:
         self.style = style  # 风格图像文件名
         self.output = output  # 输出图像文件名
         self.style_weight = style_weight  # 风格权重
-        self.noise_ratio = noise_ratio  # 随机噪声比例
+        self.noise_ratio = noise_ratio  # 初始图像的随机噪声比例
         self.iterations = iterations  # 训练迭代次数
         pass
 
@@ -202,7 +201,11 @@ class NeuralStyle:
         L_total = L_content + self.style_weight * L_style
         return L_total
 
-    def main(self):
+    def draw(self):
+        """主程序
+        工作流程：
+        读入图片 >>> 构建神经网络 >>> 计算loss >>> 迭代训练 >>> 保存结果
+        """
         # 将文件路径补充完整
         content_path = os.path.join(CONTENT_DIR, self.content)
         style_path = os.path.join(STYLE_DIR, self.style)
@@ -216,93 +219,27 @@ class NeuralStyle:
         style_img = self.read_image(style_path, shape)
         init_img = self.noise_image(content_img, shape, self.noise_ratio)
         # 构建神经网络
-        print(">>>Building neaural net...")
+        print(">>>正在构建神经网络...")
         net = self.build_vgg19(shape)  # TODO
         sess = tf.Session()
         sess.run(tf.global_variables_initializer())
-
-
-def read_image(content, style):
-    def get_shape():
-        height, width, channel = content.shape
-        return height, width, channel
-
-    def load(path):
-        img = scipy.misc.imread(path)
-        # shape (h, w, d) to (1, h, w, d)
-        img = img[np.newaxis, :h, :w, :d]
-        # Input to the VGG model expects the mean to be subtracted.
-        img = img - MEAN_VALUES
-        return img
-
-    h, w, d = get_shape()
-    content_img = load(content)
-    style_img = load(style)
-    return content_img, style_img
-
-
-def save_image(path, img):
-    # Output should add back the mean.
-    img = img + MEAN_VALUES
-    # shape (1, h, w, d) to (h, w, d)
-    img = img[0]
-    img = np.clip(img, 0, 255).astype('uint8')
-    scipy.misc.imsave(path, img)
-
-
-def noise_image(img):
-    _, h, w, d = img.shape
-    init = np.random.uniform(-20, 20, (1, h, w, d)).astype('float32')
-    init = args.noise * init + (1. - args.noise) * img
-    return init
-
-
-def main(content, style):
-    # 构建神经网络
-    print(">>>Building neaural net...")
-    net = build_vgg19(content_img)
-    sess = tf.Session()
-    sess.run(tf.global_variables_initializer())
-    # 计算loss
-    print(">>>Calculating: L_total = L_content + weight * L_style")
-    sess.run([net['input'].assign(content_img)])
-    L_content = sum(map(lambda l: l[1] * content_layer_loss(sess.run(net[l[0]]), net[l[0]]), CONTENT_LAYERS))
-    sess.run([net['input'].assign(style_img)])
-    L_style = sum(map(lambda l: l[1] * style_layer_loss(sess.run(net[l[0]]), net[l[0]]), STYLE_LAYERS))
-    L_total = L_content + args.weight * L_style
-
-    """minimize with lbfgs"""
-    print("minimizing with lbfgs...")
-    optimizer = tf.contrib.opt.ScipyOptimizerInterface(L_total, method='L-BFGS-B',
-                                                       options={'maxiter': args.iter, 'disp': 1})
-    sess.run(tf.global_variables_initializer())
-    sess.run(net['input'].assign(init_img))
-    optimizer.minimize(sess)
-    result_img = sess.run(net['input'])
-
-    """output"""
-    print("outputing image...")
-    save_image(o, result_img)
+        # 计算loss
+        print(">>>正在计算loss值")
+        L_total = self.loss(sess, net, content_img, style_img)
+        # minimize with lbfgs
+        print(">>>开始使用 L-BFGS-B 方法进行迭代({}次)...".format(self.iterations))
+        optimizer = tf.contrib.opt.ScipyOptimizerInterface(L_total, method='L-BFGS-B',
+                                                           options={'maxiter': self.iterations, 'disp': 1})
+        sess.run(tf.global_variables_initializer())
+        sess.run(net['input'].assign(init_img))
+        optimizer.minimize(sess)
+        result_img = sess.run(net['input'])
+        # 保存图片
+        print(">>>迭代完成，正在保存图片，请不要关闭程序...")
+        self.save_image(output_path, result_img)
 
 
 if __name__ == '__main__':
-    args = build_parser()
-    mode = input("Input '1' to make just one image, '2' to make all images in the folder:")
-    if args.mode == "ONE":
-        print('*** make one! ***')
-        c_image = input('Content image:')
-        s_image = input('Style image:')
-        main(args.content, args.style)
-    else:
-        print('*** make all! ***')
-        content_list = list()
-        style_list = list()
-        for rt, dirs, files in os.walk(CONTENT_DIR):
-            for f in files:
-                content_list.append(f)
-        for rt, dirs, files in os.walk(STYLE_DIR):
-            for f in files:
-                style_list.append(f)
-        for c_image in content_list:
-            for s_image in style_list:
-                main(c_image, s_image)
+    option = build_parser()
+    artist = NeuralStyle(option.content, option.style)
+    artist.draw()
